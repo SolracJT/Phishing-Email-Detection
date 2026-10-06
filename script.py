@@ -29,7 +29,7 @@ model_random_forest = RandomForestClassifier()
 y_pred = model_logistics_regression.predict(X_test_scaled)
 y_proba = model_logistics_regression.predict_proba(X_test_scaled)
 
-print(accuracy_score(y_test, y_pred)
+print(accuracy_score(y_test, y_pred))
 print(precision_score(y_test, y_pred, zero_division=0))
 print(recall_score(y_test, y_pred, zero_division=0))
 print(f1_score(y_test, y_pred, zero_division=0))
