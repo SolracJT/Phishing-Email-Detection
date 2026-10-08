@@ -21,6 +21,51 @@ const classification =
 
 
 /* =========================================
+   TOAST
+========================================= */
+
+let toastTimer = null;
+
+function showToast(message, type = "") {
+
+    const existingToast =
+        document.querySelector(".toast");
+
+    if (existingToast) {
+        existingToast.remove();
+    }
+
+    const toast =
+        document.createElement("div");
+
+    toast.className =
+        `toast ${type}`;
+
+    toast.textContent =
+        message;
+
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.classList.add("show");
+    });
+
+    clearTimeout(toastTimer);
+
+    toastTimer =
+        setTimeout(() => {
+
+            toast.classList.remove("show");
+
+            setTimeout(() => {
+                toast.remove();
+            }, 250);
+
+        }, 2800);
+}
+
+
+/* =========================================
    CHARACTER COUNTER
 ========================================= */
 
@@ -52,6 +97,11 @@ function resetResult() {
 
     classification.className =
         "result-card-value";
+
+    classification.parentElement.classList.remove(
+        "result-success",
+        "result-danger"
+    );
 }
 
 
@@ -66,6 +116,13 @@ clearButton.addEventListener("click", function () {
     characterCount.textContent = "0";
 
     resetResult();
+
+    showToast(
+        "Email input cleared.",
+        ""
+    );
+
+    emailText.focus();
 
 });
 
@@ -87,6 +144,15 @@ exampleButton.addEventListener("click", function () {
     characterCount.textContent =
         emailText.value.length;
 
+    resetResult();
+
+    showToast(
+        "Example phishing email loaded.",
+        ""
+    );
+
+    emailText.focus();
+
 });
 
 
@@ -94,73 +160,246 @@ exampleButton.addEventListener("click", function () {
    ANALYZE BUTTON
 ========================================= */
 
-analyzeButton.addEventListener("click", function () {
+analyzeButton.addEventListener(
+    "click",
+    async function () {
 
-    const email =
-        emailText.value.trim();
-
-
-    if (email === "") {
-
-        resultStatus.innerHTML =
-            '<span class="result-status-dot"></span> Input Required';
-
-        resultStatus.style.background =
-            "#fff0f0";
-
-        resultStatus.style.color =
-            "#d93f3f";
-
-        classification.textContent =
-            "No email content";
-
-        classification.className =
-            "result-card-value phishing";
-
-        return;
-    }
+        const email =
+            emailText.value.trim();
 
 
-    /*
-        Temporary frontend behavior.
+        /* Empty input */
 
-        This will eventually be replaced with
-        a request to the Flask backend.
+        if (email === "") {
 
-        Example:
+            resultStatus.innerHTML =
+                '<span class="result-status-dot"></span> Input Required';
 
-        fetch("/predict", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                email: email
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
+            resultStatus.style.background =
+                "#fff0f0";
+
+            resultStatus.style.color =
+                "#d93f3f";
 
             classification.textContent =
-                data.prediction;
+                "No email content";
 
-        });
-    */
+            classification.className =
+                "result-card-value phishing";
+
+            showToast(
+                "Please enter an email before analyzing.",
+                "error"
+            );
+
+            emailText.focus();
+
+            return;
+        }
 
 
-    resultStatus.innerHTML =
-        '<span class="result-status-dot"></span> Awaiting Model';
+        /* Loading state */
 
-    resultStatus.style.background =
-        "#fff4ef";
+        analyzeButton.disabled = true;
 
-    resultStatus.style.color =
-        "#ff6c37";
+        analyzeButton.innerHTML =
+            '<span class="button-loader"></span> Analyzing...';
 
-    classification.textContent =
-        "Ready for Flask Model";
 
-    classification.className =
-        "result-card-value";
+        resultStatus.innerHTML =
+            '<span class="result-status-dot"></span> Analyzing';
 
-});
+        resultStatus.style.background =
+            "#fff4ef";
+
+        resultStatus.style.color =
+            "#ff6c37";
+
+        classification.textContent =
+            "Analyzing email...";
+
+        classification.className =
+            "result-card-value";
+
+
+        try {
+
+            const response =
+                await fetch("/predict", {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        email: email
+                    })
+
+                });
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Prediction failed."
+                );
+            }
+
+
+            /* =====================================
+               PHISHING RESULT
+            ===================================== */
+
+            if (
+                data.prediction ===
+                "Phishing Email"
+            ) {
+
+                classification.textContent =
+                    "Phishing Email";
+
+                classification.className =
+                    "result-card-value phishing result-reveal";
+
+
+                resultStatus.innerHTML =
+                    '<span class="result-status-dot"></span> Phishing Detected';
+
+                resultStatus.style.background =
+                    "#fff0f0";
+
+                resultStatus.style.color =
+                    "#d93f3f";
+
+
+                resultStatus
+                    .querySelector(".result-status-dot")
+                    .style.background =
+                    "#d93f3f";
+
+
+                classification.parentElement
+                    .classList.add("result-danger");
+
+
+                resultStatus.classList.add(
+                    "result-pulse"
+                );
+
+
+                showToast(
+                    "Analysis complete: phishing detected.",
+                    "error"
+                );
+
+
+            }
+
+            /* =====================================
+               SAFE RESULT
+            ===================================== */
+
+            else {
+
+                classification.textContent =
+                    "Safe Email";
+
+                classification.className =
+                    "result-card-value legitimate result-reveal";
+
+
+                resultStatus.innerHTML =
+                    '<span class="result-status-dot"></span> No Threat Detected';
+
+                resultStatus.style.background =
+                    "#eef9f1";
+
+                resultStatus.style.color =
+                    "#16883e";
+
+
+                resultStatus
+                    .querySelector(".result-status-dot")
+                    .style.background =
+                    "#16883e";
+
+
+                classification.parentElement
+                    .classList.add("result-success");
+
+
+                resultStatus.classList.add(
+                    "result-pulse"
+                );
+
+
+                showToast(
+                    "Analysis complete: email appears safe.",
+                    "success"
+                );
+
+            }
+
+
+            /* Remove animation classes after animation */
+
+            setTimeout(() => {
+
+                classification.classList.remove(
+                    "result-reveal"
+                );
+
+                resultStatus.classList.remove(
+                    "result-pulse"
+                );
+
+            }, 600);
+
+
+        } catch (error) {
+
+            console.error(error);
+
+
+            resultStatus.innerHTML =
+                '<span class="result-status-dot"></span> Error';
+
+            resultStatus.style.background =
+                "#fff0f0";
+
+            resultStatus.style.color =
+                "#d93f3f";
+
+
+            classification.textContent =
+                "Unable to analyze email";
+
+            classification.className =
+                "result-card-value phishing";
+
+
+            classification.parentElement
+                .classList.add("result-danger");
+
+
+            showToast(
+                "Unable to connect to the detection model.",
+                "error"
+            );
+
+        } finally {
+
+            analyzeButton.disabled = false;
+
+            analyzeButton.innerHTML =
+                "Analyze Email";
+
+        }
+
+    }
+);
