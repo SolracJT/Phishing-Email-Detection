@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import joblib
 import os
@@ -296,4 +295,3 @@ elif page == "About Project":
         "It should be used as a classification aid rather than a "
         "replacement for comprehensive email security."
     )
-```
