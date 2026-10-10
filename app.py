@@ -1,27 +1,58 @@
-import streamlit as st
-import joblib
 import os
-import matplotlib.pyplot as plt
+import joblib
+import streamlit as st
 import numpy as np
-from sklearn.metrics import ConfusionMatrixDisplay
+import plotly.express as px
+import plotly.graph_objects as go
 
-# Page configuration
+# =====================================================
+# PAGE CONFIGURATION
+# =====================================================
 st.set_page_config(
     page_title="Phishing Email Detection",
     page_icon="🛡️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Load trained model
+# =====================================================
+# PROJECT SETTINGS
+# =====================================================
 MODEL_PATH = os.path.join("models", "phishing_detector.joblib")
 
+GITHUB_URL = "https://github.com/SolracJT/Phishing-Email-Detection"
+DOCS_URL = "https://docs.google.com/document/d/158QBPo9VJkvhNE59U4q9saSwNBXCTlEQ/edit"
+
+TOTAL_EMAILS = 17522
+SAFE_EMAILS = 10978
+PHISHING_EMAILS = 6544
+
+ACCURACY = 97.83
+PRECISION = 98.05
+RECALL = 96.10
+F1_SCORE = 97.07
+
+# Chart colors
+NAVY = "#172554"
+BLUE = "#3B82F6"
+CYAN = "#06B6D4"
+GREEN = "#16A34A"
+RED = "#DC2626"
+MUTED = "#64748B"
+GRID = "#E2E8F0"
+
+# =====================================================
+# LOAD MODEL
+# =====================================================
 @st.cache_resource
 def load_model():
     return joblib.load(MODEL_PATH)
 
 model = load_model()
 
-# Example email
+# =====================================================
+# SESSION STATE
+# =====================================================
 EXAMPLE_EMAIL = """URGENT: Your account has been suspended!
 
 Dear Customer,
@@ -36,63 +67,269 @@ will result in permanent suspension.
 Thank you,
 Security Department"""
 
-# Session state for email input
 if "email_input" not in st.session_state:
     st.session_state.email_input = ""
 
-# Sidebar navigation
-st.sidebar.title("🛡️ Phishing Detector")
-page = st.sidebar.radio(
-    "Navigation",
-    ["Email Detector", "Model Evaluation", "About Project"]
-)
+def load_example():
+    st.session_state.email_input = EXAMPLE_EMAIL
 
-st.sidebar.divider()
-st.sidebar.caption("TF-IDF + Logistic Regression")
+def clear_email():
+    st.session_state.email_input = ""
 
-# -------------------------
-# EMAIL DETECTOR
-# -------------------------
-if page == "Email Detector":
-    st.title("Phishing Email Detection")
-    st.write(
-        "Analyze email content using a machine learning model "
-        "to classify it as Phishing Email or Safe Email."
+# =====================================================
+# CUSTOM STYLE
+# =====================================================
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #F8FAFC;
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1450px;
+    }
+
+    [data-testid="stSidebar"] {
+        background-color: #F1F5F9;
+        border-right: 1px solid #E2E8F0;
+    }
+
+    .hero {
+        background: linear-gradient(120deg, #172554 0%, #1D4ED8 100%);
+        padding: 28px 30px;
+        border-radius: 18px;
+        color: white;
+        margin: 10px 0 24px 0;
+    }
+
+    .hero h2 {
+        color: white;
+        margin: 0 0 8px 0;
+        font-size: 28px;
+    }
+
+    .hero p {
+        color: #DBEAFE;
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.6;
+    }
+
+    .section-note {
+        color: #64748B;
+        font-size: 14px;
+        margin-top: -8px;
+        margin-bottom: 18px;
+    }
+
+    div[data-testid="stMetric"] {
+        background-color: white;
+        border: 1px solid #E2E8F0;
+        padding: 18px 20px;
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: #64748B;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #172554;
+        font-weight: 700;
+    }
+
+    div.stButton > button,
+    div.stLinkButton > a {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 14px;
+    }
+
+    hr {
+        border-color: #E2E8F0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================================
+# PLOTLY THEME HELPER
+# =====================================================
+def style_chart(fig, height=380):
+    fig.update_layout(
+        template="plotly_white",
+        height=height,
+        margin=dict(l=20, r=20, t=65, b=25),
+        font=dict(
+            family="Arial, sans-serif",
+            size=13,
+            color=NAVY
+        ),
+        title=dict(
+            x=0.02,
+            xanchor="left",
+            font=dict(size=17, color=NAVY)
+        ),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        legend=dict(
+            bgcolor="rgba(255,255,255,0)",
+            borderwidth=0
+        ),
+        hoverlabel=dict(
+            bgcolor=NAVY,
+            font_size=13,
+            font_color="white"
+        )
+    )
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor=GRID,
+        zeroline=False
+    )
+
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False
+    )
+
+    return fig
+
+# =====================================================
+# SIDEBAR
+# =====================================================
+with st.sidebar:
+    st.markdown("## 🛡️ Phishing Detector")
+    st.caption("Machine Learning Research Project")
+    st.divider()
+
+    page = st.radio(
+        "NAVIGATION",
+        [
+            "Email Detector",
+            "Dataset Overview",
+            "Model Evaluation",
+            "About Project"
+        ],
+        label_visibility="visible"
     )
 
     st.divider()
+    st.markdown("### Research Resources")
 
-    email = st.text_area(
-        "Email Content",
-        key="email_input",
-        height=250,
-        placeholder="Paste the email content here..."
+    st.link_button(
+        "📂 GitHub Repository",
+        GITHUB_URL,
+        use_container_width=True
     )
 
-    st.caption(f"Characters: {len(email)}")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        analyze = st.button(
-            "🔍 Analyze Email",
-            use_container_width=True,
-            type="primary"
+    if DOCS_URL.startswith("https://"):
+        st.link_button(
+            "📄 Research Document",
+            DOCS_URL,
+            use_container_width=True
+        )
+    else:
+        st.caption(
+            "Add your Google Docs URL to DOCS_URL in app.py."
         )
 
-    with col2:
-        if st.button("📝 Load Example", use_container_width=True):
-            st.session_state.email_input = EXAMPLE_EMAIL
-            st.rerun()
+    st.divider()
+    st.caption("TF-IDF + Logistic Regression")
+    st.caption("Binary email classification")
 
-    with col3:
-        if st.button("🗑️ Clear", use_container_width=True):
-            st.session_state.email_input = ""
-            st.rerun()
+# =====================================================
+# EMAIL DETECTOR
+# =====================================================
+if page == "Email Detector":
+
+    st.markdown("""
+    <div class="hero">
+        <h2>Email Security Analysis</h2>
+        <p>
+            Analyze email content using TF-IDF and Logistic Regression.
+            Identify potentially suspicious messages in seconds.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    left, right = st.columns([1.65, 1], gap="large")
+
+    with left:
+        st.subheader("Email Content")
+        st.markdown(
+            '<p class="section-note">Paste the email message you want to analyze.</p>',
+            unsafe_allow_html=True
+        )
+
+        email = st.text_area(
+            "Email message",
+            key="email_input",
+            height=280,
+            placeholder=(
+                "Paste the email subject and body here...\n\n"
+                "Example: Dear Customer, we noticed unusual activity..."
+            ),
+            label_visibility="collapsed"
+        )
+
+        st.caption(f"{len(email):,} characters")
+
+        btn1, btn2, btn3 = st.columns(3)
+
+        with btn1:
+            analyze = st.button(
+                "🔍 Analyze Email",
+                type="primary",
+                use_container_width=True
+            )
+
+        with btn2:
+            st.button(
+                "📝 Load Example",
+                on_click=load_example,
+                use_container_width=True
+            )
+
+        with btn3:
+            st.button(
+                "Clear",
+                on_click=clear_email,
+                use_container_width=True
+            )
+
+    with right:
+        st.subheader("Detection Method")
+
+        with st.container(border=True):
+            st.markdown("#### 01 · Feature Extraction")
+            st.write("TF-IDF converts email text into numerical features.")
+
+            st.divider()
+
+            st.markdown("#### 02 · Classification")
+            st.write("Logistic Regression predicts one of two email classes.")
+
+            st.divider()
+
+            st.markdown("#### 03 · Result")
+            st.markdown(
+                f"**Model accuracy:** {ACCURACY:.2f}%"
+            )
+            st.caption(
+                "Measured on the held-out test dataset. "
+                "This is not a guarantee for individual emails."
+            )
 
     if analyze:
         if not email.strip():
-            st.warning("Please enter email content first.")
+            st.warning("Please enter email content before analyzing.")
         else:
             prediction = model.predict([email.strip()])[0]
 
@@ -102,196 +339,383 @@ if page == "Email Detector":
             if prediction == 1:
                 st.error("🚨 Phishing Email")
                 st.write(
-                    "The model classified this email as a potential "
-                    "phishing message. Avoid clicking suspicious links "
+                    "The model classified this message as potentially "
+                    "phishing. Avoid interacting with suspicious links "
                     "or sharing sensitive information."
                 )
             else:
                 st.success("✅ Safe Email")
                 st.write(
-                    "The model classified this email as safe. "
-                    "However, this result does not guarantee that "
-                    "the email is harmless."
+                    "The model classified this message as safe. "
+                    "This does not guarantee that the email is harmless."
                 )
 
-            st.info(
-                "Model: Logistic Regression | "
-                "Feature Extraction: TF-IDF"
+            result_col1, result_col2 = st.columns(2)
+
+            with result_col1:
+                st.metric(
+                    "Predicted Class",
+                    "Phishing Email" if prediction == 1 else "Safe Email"
+                )
+
+            with result_col2:
+                st.metric("Classification Method", "TF-IDF + LR")
+
+            st.caption(
+                "Text-based classification only. Sender identity, "
+                "attachments, and linked websites are not independently "
+                "verified."
             )
 
-# -------------------------
-# MODEL EVALUATION
-# -------------------------
-elif page == "Model Evaluation":
-    st.title("Model Evaluation")
-    st.write(
-        "Performance of the selected model on the held-out test dataset."
+# =====================================================
+# DATASET OVERVIEW
+# =====================================================
+elif page == "Dataset Overview":
+
+    st.title("Dataset Overview")
+    st.markdown(
+        '<p class="section-note">Composition of the cleaned email dataset used in this project.</p>',
+        unsafe_allow_html=True
     )
+
+    safe_pct = SAFE_EMAILS / TOTAL_EMAILS * 100
+    phishing_pct = PHISHING_EMAILS / TOTAL_EMAILS * 100
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Total Emails", f"{TOTAL_EMAILS:,}")
+    col2.metric("Safe Emails", f"{SAFE_EMAILS:,}", f"{safe_pct:.2f}% of dataset")
+    col3.metric("Phishing Emails", f"{PHISHING_EMAILS:,}", f"{phishing_pct:.2f}% of dataset")
 
     st.divider()
+    st.subheader("Class Distribution")
 
-    # Final held-out test metrics
-    accuracy = 97.83
-    precision = 98.05
-    recall = 96.10
-    f1_score = 97.07
+    chart_left, chart_right = st.columns(2, gap="large")
 
-    col1, col2, col3, col4 = st.columns(4)
+    # Donut chart
+    with chart_left:
+        donut = go.Figure(
+            data=[
+                go.Pie(
+                    labels=["Safe Email", "Phishing Email"],
+                    values=[SAFE_EMAILS, PHISHING_EMAILS],
+                    hole=0.68,
+                    sort=False,
+                    marker=dict(
+                        colors=[GREEN, RED],
+                        line=dict(color="white", width=4)
+                    ),
+                    textinfo="percent",
+                    textposition="outside",
+                    hovertemplate=(
+                        "<b>%{label}</b><br>"
+                        "Emails: %{value:,}<br>"
+                        "Share: %{percent}<extra></extra>"
+                    )
+                )
+            ]
+        )
 
-    col1.metric("Accuracy", f"{accuracy:.2f}%")
-    col2.metric("Precision", f"{precision:.2f}%")
-    col3.metric("Recall", f"{recall:.2f}%")
-    col4.metric("F1-Score", f"{f1_score:.2f}%")
+        donut.update_layout(
+            title="Dataset Composition",
+            annotations=[
+                dict(
+                    text=f"<b>{TOTAL_EMAILS:,}</b><br><sup>Total emails</sup>",
+                    x=0.5,
+                    y=0.5,
+                    font=dict(size=19, color=NAVY),
+                    showarrow=False
+                )
+            ],
+            showlegend=True,
+            legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center")
+        )
 
-    st.caption(
-        "Test set: 3,505 emails | "
-        "Training and testing used an 80:20 stratified split."
+        style_chart(donut, 420)
+        st.plotly_chart(donut, use_container_width=True)
+
+    # Horizontal bar chart
+    with chart_right:
+        bar = px.bar(
+            x=[SAFE_EMAILS, PHISHING_EMAILS],
+            y=["Safe Email", "Phishing Email"],
+            orientation="h",
+            text=[f"{SAFE_EMAILS:,}", f"{PHISHING_EMAILS:,}"],
+            color=["Safe Email", "Phishing Email"],
+            color_discrete_map={
+                "Safe Email": GREEN,
+                "Phishing Email": RED
+            },
+            labels={
+                "x": "Number of Emails",
+                "y": "Class",
+                "color": "Email Class"
+            },
+            title="Email Count by Class"
+        )
+
+        bar.update_traces(
+            textposition="outside",
+            cliponaxis=False,
+            hovertemplate="%{y}<br>Emails: %{x:,}<extra></extra>"
+        )
+
+        bar.update_layout(
+            showlegend=False,
+            xaxis=dict(range=[0, SAFE_EMAILS * 1.22])
+        )
+
+        style_chart(bar, 420)
+        st.plotly_chart(bar, use_container_width=True)
+
+    st.divider()
+    st.subheader("Dataset Details")
+
+    info1, info2 = st.columns(2)
+
+    with info1:
+        with st.container(border=True):
+            st.markdown("#### Dataset Information")
+            st.write("**Source:** Phishing Email Dataset on Kaggle")
+            st.write("**Original records:** 18,650")
+            st.write("**Final cleaned records:** 17,522")
+            st.write("**Train-test split:** 80:20, stratified")
+            st.write("**Missing values:** 0")
+
+    with info2:
+        with st.container(border=True):
+            st.markdown("#### Classification Labels")
+            st.write("**Input feature:** `Email Text`")
+            st.write("**Target label:** `Email Type`")
+            st.write("**Label 0:** Safe Email")
+            st.write("**Label 1:** Phishing Email")
+
+    st.info(
+        "The final dataset contains 10,978 safe emails and 6,544 phishing "
+        "emails after duplicate email texts were removed."
     )
 
+# =====================================================
+# MODEL EVALUATION
+# =====================================================
+elif page == "Model Evaluation":
+
+    st.title("Model Evaluation")
+    st.markdown(
+        '<p class="section-note">Held-out test performance and comparison of the two model configurations.</p>',
+        unsafe_allow_html=True
+    )
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    m1.metric("Accuracy", f"{ACCURACY:.2f}%")
+    m2.metric("Precision", f"{PRECISION:.2f}%")
+    m3.metric("Recall", f"{RECALL:.2f}%")
+    m4.metric("F1-Score", f"{F1_SCORE:.2f}%")
+
+    st.caption("Evaluation set: 3,505 emails · Stratified 80:20 split")
+
+    st.divider()
     st.subheader("Confusion Matrix")
 
-    # Rows: actual labels
-    # Columns: predicted labels
-    # Label order: Safe Email (0), Phishing Email (1)
     cm = np.array([
         [2171, 25],
         [51, 1258]
     ])
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    labels = ["Safe Email", "Phishing Email"]
 
-    disp = ConfusionMatrixDisplay(
-        confusion_matrix=cm,
-        display_labels=["Safe Email", "Phishing Email"]
+    heatmap = go.Figure(
+        data=go.Heatmap(
+            z=cm,
+            x=labels,
+            y=labels,
+            colorscale=[
+                [0.0, "#EFF6FF"],
+                [0.5, "#60A5FA"],
+                [1.0, "#1D4ED8"]
+            ],
+            showscale=False,
+            text=cm,
+            texttemplate="%{text:,}",
+            textfont=dict(size=22, color=NAVY),
+            hovertemplate=(
+                "Actual: %{y}<br>"
+                "Predicted: %{x}<br>"
+                "Count: %{z:,}<extra></extra>"
+            )
+        )
     )
 
-    disp.plot(
-        ax=ax,
-        cmap="Blues",
-        values_format="d",
-        colorbar=False
+    heatmap.update_layout(
+        title="Actual vs. Predicted Class",
+        xaxis_title="Predicted Label",
+        yaxis_title="Actual Label",
+        yaxis=dict(autorange="reversed", scaleanchor="x"),
     )
 
-    ax.set_title("Final Model Confusion Matrix")
-    fig.tight_layout()
+    style_chart(heatmap, 430)
+    st.plotly_chart(heatmap, use_container_width=True)
 
-    st.pyplot(fig)
-    plt.close(fig)
+    with st.expander("Interpret the confusion matrix"):
+        cm1, cm2, cm3, cm4 = st.columns(4)
+        cm1.metric("True Negatives", "2,171")
+        cm2.metric("False Positives", "25")
+        cm3.metric("False Negatives", "51")
+        cm4.metric("True Positives", "1,258")
 
-    st.markdown(
-        """
-        **Interpretation**
-
-        - **2,171 True Negatives:** Safe emails correctly identified.
-        - **25 False Positives:** Safe emails incorrectly flagged as phishing.
-        - **51 False Negatives:** Phishing emails incorrectly classified as safe.
-        - **1,258 True Positives:** Phishing emails correctly detected.
-        """
-    )
+        st.write(
+            "False negatives are phishing emails incorrectly classified "
+            "as safe. There were 51 false negatives in the test set."
+        )
 
     st.divider()
     st.subheader("Configuration Comparison")
 
-    config1 = {
-        "Accuracy": 97.83,
-        "Precision": 98.05,
-        "Recall": 96.10,
-        "F1-Score": 97.07
-    }
+    metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+    config1 = [97.83, 98.05, 96.10, 97.07]
+    config2 = [94.84, 98.37, 87.62, 92.69]
 
-    config2 = {
-        "Accuracy": 94.84,
-        "Precision": 98.37,
-        "Recall": 87.62,
-        "F1-Score": 92.69
-    }
+    comparison = go.Figure()
 
-    metrics = list(config1.keys())
-    values1 = list(config1.values())
-    values2 = list(config2.values())
-
-    x = np.arange(len(metrics))
-    width = 0.35
-
-    fig2, ax2 = plt.subplots(figsize=(9, 5))
-
-    bars1 = ax2.bar(
-        x - width / 2,
-        values1,
-        width,
-        label="Configuration 1"
+    comparison.add_trace(
+        go.Bar(
+            name="Configuration 1",
+            x=metrics,
+            y=config1,
+            marker_color=BLUE,
+            text=[f"{v:.2f}%" for v in config1],
+            textposition="outside",
+            cliponaxis=False,
+            hovertemplate="%{x}<br>Score: %{y:.2f}%<extra></extra>"
+        )
     )
 
-    bars2 = ax2.bar(
-        x + width / 2,
-        values2,
-        width,
-        label="Configuration 2"
+    comparison.add_trace(
+        go.Bar(
+            name="Configuration 2",
+            x=metrics,
+            y=config2,
+            marker_color=CYAN,
+            text=[f"{v:.2f}%" for v in config2],
+            textposition="outside",
+            cliponaxis=False,
+            hovertemplate="%{x}<br>Score: %{y:.2f}%<extra></extra>"
+        )
     )
 
-    ax2.set_ylabel("Score (%)")
-    ax2.set_title("Model Configuration Comparison")
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(metrics)
-    ax2.set_ylim(80, 101)
-    ax2.legend()
-    ax2.grid(axis="y", linestyle="--", alpha=0.35)
+    comparison.update_layout(
+        title="Model Performance by Metric",
+        barmode="group",
+        yaxis=dict(
+            title="Score (%)",
+            range=[80, 102],
+            ticksuffix="%"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
 
-    for bars in (bars1, bars2):
-        for bar in bars:
-            value = bar.get_height()
-            ax2.annotate(
-                f"{value:.2f}%",
-                (bar.get_x() + bar.get_width() / 2, value),
-                xytext=(0, 4),
-                textcoords="offset points",
-                ha="center",
-                fontsize=8
+    style_chart(comparison, 450)
+    st.plotly_chart(comparison, use_container_width=True)
+
+    st.success(
+        "Configuration 1 was selected for its stronger overall "
+        "performance and higher phishing recall."
+    )
+
+    st.caption(
+        "Configuration 1: unigram TF-IDF, C=1.0. "
+        "Configuration 2: unigram and bigram TF-IDF, C=0.1."
+    )
+
+# =====================================================
+# ABOUT PROJECT
+# =====================================================
+elif page == "About Project":
+
+    st.markdown("""
+    <div class="hero">
+        <h2>About the Project</h2>
+        <p>
+            Phishing Email Detection Using TF-IDF and Logistic Regression.
+            A machine learning web application that classifies email text
+            into safe and phishing categories.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.subheader("How It Works")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        with st.container(border=True):
+            st.markdown("### 01")
+            st.markdown("#### Email Input")
+            st.write("The user provides the text of an email.")
+
+    with c2:
+        with st.container(border=True):
+            st.markdown("### 02")
+            st.markdown("#### TF-IDF")
+            st.write("Email text is converted into numerical features.")
+
+    with c3:
+        with st.container(border=True):
+            st.markdown("### 03")
+            st.markdown("#### Classification")
+            st.write("Logistic Regression predicts the email class.")
+
+    st.divider()
+    st.subheader("Technology Stack")
+
+    t1, t2, t3, t4 = st.columns(4)
+    t1.metric("Classifier", "Logistic Regression")
+    t2.metric("Feature Extraction", "TF-IDF")
+    t3.metric("Max Features", "10,000")
+    t4.metric("Classes", "2")
+
+    st.divider()
+    st.subheader("Research Resources")
+
+    r1, r2 = st.columns(2)
+
+    with r1:
+        with st.container(border=True):
+            st.markdown("#### 💻 Source Code")
+            st.write("Explore the project code and implementation.")
+            st.link_button(
+                "Open GitHub Repository",
+                GITHUB_URL,
+                use_container_width=True
             )
 
-    fig2.tight_layout()
-    st.pyplot(fig2)
-    plt.close(fig2)
+    with r2:
+        with st.container(border=True):
+            st.markdown("#### 📚 Research Documentation")
+            st.write("Read the project's documentation and methodology.")
+
+            if DOCS_URL.startswith("https://"):
+                st.link_button(
+                    "Open Google Docs",
+                    DOCS_URL,
+                    use_container_width=True
+                )
+            else:
+                st.warning("Configure your Google Docs URL in app.py.")
+
+    st.divider()
+    st.subheader("Scope and Limitations")
 
     st.write(
-        "**Selected model:** Configuration 1, using word-level "
-        "TF-IDF unigram features and Logistic Regression with C=1.0. "
-        "It was selected for its stronger overall performance and "
-        "higher phishing recall."
-    )
-
-# -------------------------
-# ABOUT PROJECT
-# -------------------------
-elif page == "About Project":
-    st.title("About the Project")
-
-    st.write(
-        "Phishing Email Detection Using TF-IDF and Logistic Regression "
-        "is a machine learning project that classifies email text as "
-        "Safe Email or Phishing Email."
-    )
-
-    st.subheader("Machine Learning Approach")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Feature Extraction", "TF-IDF")
-    col2.metric("Classifier", "Logistic Regression")
-    col3.metric("Classes", "2")
-
-    st.subheader("Dataset Summary")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Final Emails", "17,522")
-    col2.metric("Safe Emails", "10,978")
-    col3.metric("Phishing Emails", "6,544")
-
-    st.subheader("Project Limitations")
-
-    st.write(
-        "The model analyzes email text only. It does not independently "
-        "verify sender identity, inspect attachments, follow links, "
-        "or guarantee that a message classified as safe is harmless. "
-        "It should be used as a classification aid rather than a "
-        "replacement for comprehensive email security."
+        "The classifier analyzes email text only. It does not independently "
+        "verify sender identity, inspect attachments, or access linked "
+        "websites. A safe prediction does not guarantee that an email is "
+        "harmless. The application is intended as a classification aid."
     )
